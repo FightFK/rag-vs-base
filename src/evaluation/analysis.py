@@ -11,7 +11,7 @@ from src.config import Config
 from src.evaluation.metrics import exact_match, f1_score
 
 
-def load_results(path: Path) -> List[dict]:
+def load_results(path: Path, split: str | None = None, dataset_config: str | None = None) -> List[dict]:
     rows: List[dict] = []
     if not path.exists():
         return rows
@@ -21,9 +21,14 @@ def load_results(path: Path) -> List[dict]:
             if not line:
                 continue
             try:
-                rows.append(json.loads(line))
+                row = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            if split is not None and row.get("split") and row["split"] != split:
+                continue
+            if dataset_config is not None and row.get("dataset_config") and row["dataset_config"] != dataset_config:
+                continue
+            rows.append(row)
     return rows
 
 
@@ -71,13 +76,16 @@ def _wrapper(methods, values) -> pd.DataFrame:
 
 def analyze(config: Config) -> Dict[str, pd.DataFrame]:
     config.ensure_dirs()
-    rows = load_results(config.results_file)
+    rows = load_results(config.results_file, split=config.split, dataset_config=config.dataset_config)
     df = compute_metrics(rows)
     summary = build_summary(df)
     dtl = {}
 
     if summary.empty:
         return dtl
+
+    # Tag output files by split + dataset_config so multiple experiments coexist.
+    tag = f"{config.dataset_config}_{config.split}"
 
     # metrics/em_f1.csv
     em_f1 = pd.DataFrame(
@@ -88,18 +96,18 @@ def analyze(config: Config) -> Dict[str, pd.DataFrame]:
             "Latency": [df["base_latency"].mean(), df["rag_latency"].mean()],
         }
     )
-    em_f1.to_csv(config.metrics_dir / "em_f1.csv", index=False)
+    em_f1.to_csv(config.metrics_dir / f"em_f1_{tag}.csv", index=False)
 
     # summary.csv in outputs/final
-    summary.to_csv(config.final_dir / "summary.csv", index=False)
+    summary.to_csv(config.final_dir / f"summary_{tag}.csv", index=False)
 
     # Publication tables
     table1 = summary[["Method", "EM", "F1"]].copy()
     table2 = summary[["Method", "Avg Latency"]].copy()
     table3 = summary[["Method", "Error Count"]].copy()
 
-    table1.to_csv(config.final_dir / "table1_em_f1.csv", index=False)
-    table2.to_csv(config.final_dir / "table2_latency.csv", index=False)
-    table3.to_csv(config.final_dir / "table3_errors.csv", index=False)
+    table1.to_csv(config.final_dir / f"table1_em_f1_{tag}.csv", index=False)
+    table2.to_csv(config.final_dir / f"table2_latency_{tag}.csv", index=False)
+    table3.to_csv(config.final_dir / f"table3_errors_{tag}.csv", index=False)
 
     return {"summary": summary, "em_f1": em_f1, "table1": table1, "table2": table2, "table3": table3}

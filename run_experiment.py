@@ -24,6 +24,8 @@ def build_config(args: argparse.Namespace) -> Config:
         cfg.model = args.model
     if getattr(args, "ollama_model", None):
         cfg.ollama_model = args.ollama_model
+    if getattr(args, "dataset_config", None):
+        cfg.dataset_config = args.dataset_config
     cfg.split = args.split
     cfg.dify_api_key = os.getenv("DIFY_API_KEY", cfg.dify_api_key)
     cfg.dify_base_url = os.getenv("DIFY_BASE_URL", cfg.dify_base_url)
@@ -61,6 +63,9 @@ def main(argv: Optional[list[str]] = None) -> None:
     p_run = sub.add_parser("run", help="Run the experiment.")
     p_run.add_argument("--limit", type=int, default=None, help="Max samples to process this run.")
     p_run.add_argument("--split", type=str, default="validation", choices=["validation", "train", "test"])
+    p_run.add_argument("--dataset-config", dest="dataset_config", type=str, default="distractor",
+                       choices=["distractor", "fullwiki"],
+                       help="HotpotQA builder config: 'distractor' (default) or 'fullwiki'.")
     p_run.add_argument("--mode", type=str, default="both", choices=["base", "rag", "both"],
                        help="Which system(s) to run: base (Ollama only), rag (Dify only), or both.")
     p_run.add_argument("--model", type=str, default=None, help="Override publication model name in JSONL.")
@@ -70,12 +75,16 @@ def main(argv: Optional[list[str]] = None) -> None:
 
     p_an = sub.add_parser("analyze", help="Compute metrics and tables from existing results.")
     p_an.add_argument("--split", type=str, default="validation", choices=["validation", "train", "test"])
+    p_an.add_argument("--dataset-config", dest="dataset_config", type=str, default="distractor",
+                      choices=["distractor", "fullwiki"])
     p_an.add_argument("--model", type=str, default=None)
     p_an.set_defaults(func=cmd_analyze)
 
     p_all = sub.add_parser("all", help="Run experiment then analyze.")
     p_all.add_argument("--limit", type=int, default=None)
     p_all.add_argument("--split", type=str, default="validation", choices=["validation", "train", "test"])
+    p_all.add_argument("--dataset-config", dest="dataset_config", type=str, default="distractor",
+                       choices=["distractor", "fullwiki"])
     p_all.add_argument("--mode", type=str, default="both", choices=["base", "rag", "both"])
     p_all.add_argument("--model", type=str, default=None)
     p_all.add_argument("--ollama-model", dest="ollama_model", type=str, default=None)

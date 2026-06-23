@@ -30,12 +30,13 @@ class HotpotQALoader:
 
     def iter_samples(self) -> Iterator[Sample]:
         ds = self.load()
+        split = self.config.split
         for i, row in enumerate(ds):
             answer = row.get("answer", "")
             if isinstance(answer, dict):
                 answer = answer.get("value", "") or answer.get("text", "") or ""
             yield Sample(
-                id=str(i),
+                id=f"{split}-{i}",
                 question=row["question"],
                 ground_truth=str(answer).strip(),
             )

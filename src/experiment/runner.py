@@ -24,6 +24,8 @@ class SampleResult:
     id: str
     question: str
     ground_truth: str
+    split: str  # which dataset split this sample came from
+    dataset_config: str  # 'distractor' or 'fullwiki'
     base_answer: str
     rag_answer: str
     base_latency: float
@@ -146,6 +148,8 @@ class ExperimentRunner:
             id=sample.id,
             question=sample.question,
             ground_truth=sample.ground_truth,
+            split=self.config.split,
+            dataset_config=self.config.dataset_config,
             base_answer=base_answer,
             rag_answer=rag_answer,
             base_latency=base_latency,
