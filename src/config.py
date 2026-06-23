@@ -12,7 +12,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 @dataclass
 class Config:
     # Model / serving
+    # `model` is the publication name (used in JSONL records).
+    # `ollama_model` is the actual Ollama tag served locally.
     model: str = "gemma-4-e2b-it"
+    ollama_model: str = "gemma4:e2b"
     ollama_base_url: str = "http://localhost:11434"
     ollama_endpoint: str = "/api/generate"
     temperature: float = 0.0

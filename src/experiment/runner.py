@@ -35,12 +35,15 @@ class SampleResult:
 
 
 class ExperimentRunner:
-    def __init__(self, config: Config) -> None:
+    def __init__(self, config: Config, mode: str = "both") -> None:
+        if mode not in {"base", "rag", "both"}:
+            raise ValueError(f"Invalid mode: {mode!r}. Use 'base', 'rag' or 'both'.")
+        self.mode = mode
         self.config = config
         config.ensure_dirs()
         self.logger = setup_logger("experiment", config.logs_dir / "experiment.log")
         self.ollama = OllamaClient(config)
-        self.dify = DifyClient(config)
+        self.dify = DifyClient(config) if mode in {"rag", "both"} else None
         self.processed_ids: set[str] = self._load_processed_ids()
 
     # ------------------------------------------------------------------
@@ -51,6 +54,8 @@ class ExperimentRunner:
         rf = self.config.results_file
         if not rf.exists():
             return ids
+        need_base = self.mode in {"base", "both"}
+        need_rag = self.mode in {"rag", "both"}
         with rf.open("r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
@@ -58,11 +63,15 @@ class ExperimentRunner:
                     continue
                 try:
                     row = json.loads(line)
-                    if "id" in row:
-                        ids.add(str(row["id"]))
                 except json.JSONDecodeError:
                     continue
-        self.logger.info("Resumed: %d samples already processed.", len(ids))
+                if "id" not in row:
+                    continue
+                base_done = bool(row.get("base_answer"))
+                rag_done = bool(row.get("rag_answer"))
+                if not (need_base and not base_done) and not (need_rag and not rag_done):
+                    ids.add(str(row["id"]))
+        self.logger.info("Resumed: %d samples already processed for mode=%s.", len(ids), self.mode)
         return ids
 
     # ------------------------------------------------------------------
@@ -110,26 +119,28 @@ class ExperimentRunner:
         error_type: Optional[str] = None
 
         # Base system
-        try:
-            prompt = BASE_PROMPT_TEMPLATE.format(question=sample.question)
-            res = self.ollama.generate(prompt)
-            base_answer = res.answer
-            base_latency = res.latency
-        except Exception as exc:  # noqa: BLE001
-            error = True
-            error_type = f"ollama:{type(exc).__name__}"
-            self.logger.error("Ollama failed for id=%s: %s", sample.id, exc)
+        if self.mode in {"base", "both"}:
+            try:
+                prompt = BASE_PROMPT_TEMPLATE.format(question=sample.question)
+                res = self.ollama.generate(prompt)
+                base_answer = res.answer
+                base_latency = res.latency
+            except Exception as exc:  # noqa: BLE001
+                error = True
+                error_type = f"ollama:{type(exc).__name__}"
+                self.logger.error("Ollama failed for id=%s: %s", sample.id, exc)
 
         # RAG system
-        try:
-            res = self.dify.chat(sample.question)
-            rag_answer = res.answer
-            rag_latency = res.latency
-        except Exception as exc:  # noqa: BLE001
-            error = True
-            et = f"dify:{type(exc).__name__}"
-            error_type = f"{error_type};{et}" if error_type else et
-            self.logger.error("Dify failed for id=%s: %s", sample.id, exc)
+        if self.mode in {"rag", "both"}:
+            try:
+                res = self.dify.chat(sample.question)
+                rag_answer = res.answer
+                rag_latency = res.latency
+            except Exception as exc:  # noqa: BLE001
+                error = True
+                et = f"dify:{type(exc).__name__}"
+                error_type = f"{error_type};{et}" if error_type else et
+                self.logger.error("Dify failed for id=%s: %s", sample.id, exc)
 
         return SampleResult(
             id=sample.id,

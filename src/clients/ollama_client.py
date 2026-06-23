@@ -30,7 +30,7 @@ class OllamaClient:
         for attempt in range(retries):
             try:
                 payload = {
-                    "model": self.config.model,
+                    "model": self.config.ollama_model,
                     "prompt": prompt,
                     "stream": False,
                     "options": {"temperature": self.config.temperature},
