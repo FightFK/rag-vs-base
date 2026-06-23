@@ -160,7 +160,15 @@ class ExperimentRunner:
         t0 = time.perf_counter()
 
         try:
-            pbar = tqdm(loader, desc="HotpotQA")
+            # Provide a total hint to tqdm without forcing a separate dataset
+            # download (loader.__len__ would reload the dataset).
+            total_hint: Optional[int] = None
+            try:
+                total_hint = len(loader.load())
+            except Exception as exc:  # noqa: BLE001
+                self.logger.warning("Could not determine dataset size: %s", exc)
+
+            pbar = tqdm(loader.iter_samples(), desc="HotpotQA", total=total_hint)
             for sample in pbar:
                 if limit is not None and processed_this_run >= limit:
                     break

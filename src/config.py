@@ -25,6 +25,8 @@ class Config:
 
     # Dataset
     dataset_name: str = "hotpotqa/hotpot_qa"
+    # HotpotQA exposes 'distractor' (standard) and 'fullwiki' builder configs.
+    dataset_config: str = "distractor"
     split: str = "validation"
 
     # Retry behaviour

@@ -20,8 +20,16 @@ class HotpotQALoader:
     def __init__(self, config: Config) -> None:
         self.config = config
 
-    def __iter__(self) -> Iterator[Sample]:
-        ds = load_dataset(self.config.dataset_name, split=self.config.split)
+    def load(self):
+        # HotpotQA requires a builder config: 'distractor' (standard) or 'fullwiki'.
+        return load_dataset(
+            self.config.dataset_name,
+            self.config.dataset_config,
+            split=self.config.split,
+        )
+
+    def iter_samples(self) -> Iterator[Sample]:
+        ds = self.load()
         for i, row in enumerate(ds):
             answer = row.get("answer", "")
             if isinstance(answer, dict):
@@ -32,7 +40,8 @@ class HotpotQALoader:
                 ground_truth=str(answer).strip(),
             )
 
+    def __iter__(self) -> Iterator[Sample]:
+        return self.iter_samples()
+
     def __len__(self) -> int:
-        # Avoid loading twice in common usage; callers usually iterate.
-        ds = load_dataset(self.config.dataset_name, split=self.config.split)
-        return len(ds)
+        return len(self.load())
